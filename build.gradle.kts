@@ -3,7 +3,6 @@ plugins {
     kotlin("plugin.serialization") version "1.6.10"
     id("io.papermc.paperweight.userdev") version "1.3.4"
     id("net.minecrell.plugin-yml.bukkit") version "0.5.1"
-    id("com.github.johnrengelman.shadow") version "7.0.0"
     `maven-publish`
 }
 
@@ -14,6 +13,8 @@ bukkit {
     name = project.name
     version = project.version.toString()
     main = "it.pureorigins.${project.name.toLowerCase()}.${project.name}"
+    apiVersion = "1.18"
+    depend = listOf("PureCommon")
 }
 
 repositories {
@@ -28,24 +29,20 @@ dependencies {
 
 afterEvaluate {
     tasks {
-        shadowJar {
-            mergeServiceFiles()
-        }
-        
         jar {
             archiveClassifier.set("")
         }
         
-        shadowJar {
-            archiveClassifier.set("fat")
-        }
-        
         reobfJar {
-            outputJar.set(shadowJar.get().archiveFile)
+            outputJar.set(jar.get().archiveFile)
         }
         
         build {
             dependsOn(reobfJar)
+        }
+    
+        compileKotlin {
+            kotlinOptions.jvmTarget = "17"
         }
     }
 }
