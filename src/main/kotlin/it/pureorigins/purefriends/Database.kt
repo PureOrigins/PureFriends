@@ -1,9 +1,11 @@
 package it.pureorigins.purefriends
 
-import it.pureorigins.common.PaperText
-import it.pureorigins.common.paperTextFromJson
+
+import it.pureorigins.common.Text
+import it.pureorigins.common.textFromJson
 import it.pureorigins.common.toJson
 import org.jetbrains.exposed.dao.id.LongIdTable
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.*
 import java.time.Instant
 import java.time.temporal.TemporalAmount
@@ -20,17 +22,17 @@ object FriendsTable : Table("friends") {
         it[this.friendUniqueId] = friendUniqueId
     }.insertedCount > 0
     
-    fun has(playerUniqueId: UUID, friendUniqueId: UUID) = select {
+    fun has(playerUniqueId: UUID, friendUniqueId: UUID) = select(this.playerUniqueId, this.friendUniqueId).where {
         ((FriendsTable.playerUniqueId eq playerUniqueId) and (FriendsTable.friendUniqueId eq friendUniqueId)) or
                 ((FriendsTable.playerUniqueId eq friendUniqueId) and (FriendsTable.friendUniqueId eq playerUniqueId))
     }.count() > 0
     
-    fun remove(playerUniqueId: UUID, friendUniqueId: UUID) = deleteWhere {
+   fun remove(playerUniqueId: UUID, friendUniqueId: UUID) = deleteWhere {
         ((FriendsTable.playerUniqueId eq playerUniqueId) and (FriendsTable.friendUniqueId eq friendUniqueId)) or
                 ((FriendsTable.playerUniqueId eq friendUniqueId) and (FriendsTable.friendUniqueId eq playerUniqueId))
     } > 0
     
-    fun get(playerUniqueId: UUID): Set<UUID> = select {
+    fun get(playerUniqueId: UUID): Set<UUID> = select(this.playerUniqueId).where {
         (FriendsTable.playerUniqueId eq playerUniqueId) or (FriendsTable.friendUniqueId eq playerUniqueId)
     }.mapTo(hashSetOf()) { if (it[this.playerUniqueId] == playerUniqueId) it[this.friendUniqueId] else it[this.playerUniqueId] }
 }
@@ -47,17 +49,17 @@ object FriendRequestsTable : Table("friend_requests") {
     }.insertedCount > 0
     
     fun has(playerUniqueId: UUID, friendUniqueId: UUID) =
-        select { (FriendRequestsTable.playerUniqueId eq playerUniqueId) and (FriendRequestsTable.friendUniqueId eq friendUniqueId) }.count() > 0
+        select(this.playerUniqueId, FriendRequestsTable.friendUniqueId).where { (FriendRequestsTable.playerUniqueId eq playerUniqueId) and (FriendRequestsTable.friendUniqueId eq friendUniqueId) }.count() > 0
     
     fun remove(playerUniqueId: UUID, friendUniqueId: UUID) = deleteWhere {
         (FriendRequestsTable.playerUniqueId eq playerUniqueId) and (FriendRequestsTable.friendUniqueId eq friendUniqueId)
     } > 0
     
     fun get(playerUniqueId: UUID): Set<UUID> =
-        select { FriendRequestsTable.playerUniqueId eq playerUniqueId }.mapTo(hashSetOf()) { it[this.friendUniqueId] }
+        select(this.playerUniqueId).where { FriendRequestsTable.playerUniqueId eq playerUniqueId }.mapTo(hashSetOf()) { it[this.friendUniqueId] }
     
     fun inverseGet(playerUniqueId: UUID): Set<UUID> =
-        select { FriendRequestsTable.friendUniqueId eq playerUniqueId }.mapTo(hashSetOf()) { it[this.playerUniqueId] }
+        select(this.playerUniqueId).where { FriendRequestsTable.friendUniqueId eq playerUniqueId }.mapTo(hashSetOf()) { it[this.playerUniqueId] }
 }
 
 object NewsTable : LongIdTable("friend_notifications") {
@@ -66,7 +68,7 @@ object NewsTable : LongIdTable("friend_notifications") {
     val date = long("date")
     val expirationDate = long("expiration_date").nullable()
     
-    fun add(playerUniqueId: UUID, text: PaperText, expirationTime: TemporalAmount? = null) = insertIgnore {
+    fun add(playerUniqueId: UUID, text: Text, expirationTime: TemporalAmount? = null) = insertIgnore {
         it[NewsTable.playerUniqueId] = playerUniqueId
         it[NewsTable.text] = text.toJson()
         val now = Instant.now()
@@ -75,7 +77,7 @@ object NewsTable : LongIdTable("friend_notifications") {
     }
     
     fun get(playerUniqueId: UUID) =
-        select { (NewsTable.playerUniqueId eq playerUniqueId) and (expirationDate greater Instant.now().toEpochMilli()) }.orderBy(date).map { paperTextFromJson(it[text]) }
+        select(this.playerUniqueId).where { (NewsTable.playerUniqueId eq playerUniqueId) and (expirationDate greater Instant.now().toEpochMilli()) }.orderBy(date).map { textFromJson(it[text]) }
     
     fun remove(playerUniqueId: UUID) = deleteWhere { NewsTable.playerUniqueId eq playerUniqueId }
     
@@ -94,16 +96,16 @@ object BlockedPlayersTable : Table("blocked_players") {
     }.insertedCount > 0
     
     fun has(playerUniqueId: UUID, blockedUniqueId: UUID) =
-        select { (BlockedPlayersTable.playerUniqueId eq playerUniqueId) and (BlockedPlayersTable.blockedUniqueId eq blockedUniqueId) }.count() > 0
+        select(this.playerUniqueId, this.blockedUniqueId).where { (BlockedPlayersTable.playerUniqueId eq playerUniqueId) and (BlockedPlayersTable.blockedUniqueId eq blockedUniqueId) }.count() > 0
     
     fun remove(playerUniqueId: UUID, blockedUniqueId: UUID) = deleteWhere {
         (BlockedPlayersTable.playerUniqueId eq playerUniqueId) and (BlockedPlayersTable.blockedUniqueId eq blockedUniqueId)
     } > 0
     
     fun get(playerUniqueId: UUID): Set<UUID> =
-        select { BlockedPlayersTable.playerUniqueId eq playerUniqueId }.mapTo(hashSetOf()) { it[this.blockedUniqueId] }
+        select(this.playerUniqueId).where { BlockedPlayersTable.playerUniqueId eq playerUniqueId }.mapTo(hashSetOf()) { it[this.blockedUniqueId] }
     
     fun inverseGet(playerUniqueId: UUID): Set<UUID> =
-        select { BlockedPlayersTable.blockedUniqueId eq playerUniqueId }.mapTo(hashSetOf()) { it[this.playerUniqueId] }
+        select(this.playerUniqueId).where { BlockedPlayersTable.blockedUniqueId eq playerUniqueId }.mapTo(hashSetOf()) { it[this.playerUniqueId] }
     
 }
